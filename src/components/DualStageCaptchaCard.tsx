@@ -4,7 +4,7 @@ import { RotateCw, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
 import { MotionCanvas } from './MotionCanvas';
 import { FlashlightCanvas } from './FlashlightCanvas';
 import { HoneypotTraps } from './HoneypotTraps';
-import { VerificationSuccessCard } from './VerificationSuccessCard';
+import { VerificationSuccessCard, type StageType } from './VerificationSuccessCard';
 import { BotDetectedCard } from './BotDetectedCard';
 import { useSecurityEngine, type SecurityViolation } from '../hooks/useSecurityEngine';
 import { useFlashlightWords } from '../hooks/useFlashlightWords';
@@ -12,23 +12,34 @@ import { SHAPES, WORDS } from '../utils/captchaPatterns';
 
 const MOTION_ROTATION_SECONDS = 8;
 
-export function DualStageCaptchaCard() {
-  // 1. Randomize round order (50% chance Motion first, 50% chance Flashlight first)
-  const [roundTypes, setRoundTypes] = useState<['motion', 'flashlight'] | ['flashlight', 'motion']>(() =>
-    Math.random() < 0.5 ? ['motion', 'flashlight'] : ['flashlight', 'motion']
-  );
+// Fisher-Yates shuffle for true uniform randomness across 3 stages
+function generateRandomStages(): StageType[] {
+  const stages: StageType[] = ['motion-word', 'motion-shape', 'flashlight'];
+  for (let i = stages.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = stages[i]!;
+    stages[i] = stages[j]!;
+    stages[j] = temp;
+  }
+  return stages;
+}
 
-  const [currentRound, setCurrentRound] = useState<1 | 2>(1);
-  const [, setRound1Complete] = useState<boolean>(false);
-  const [, setRound2Complete] = useState<boolean>(false);
+export function DualStageCaptchaCard() {
+  // 1. Randomized 3-stage sequence
+  const [stages, setStages] = useState<StageType[]>(generateRandomStages);
+  const [currentRound, setCurrentRound] = useState<1 | 2 | 3>(1);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
 
   // Form input and error shake state
   const [userInput, setUserInput] = useState<string>('');
   const [inputError, setInputError] = useState<boolean>(false);
 
+  // Active stage
+  const activeStage: StageType = stages[currentRound - 1] ?? 'motion-word';
+  const isMotion = activeStage === 'motion-word' || activeStage === 'motion-shape';
+  const motionMode: 'word' | 'shape' = activeStage === 'motion-shape' ? 'shape' : 'word';
+
   // Motion stage specific state
-  const [motionMode, setMotionMode] = useState<'word' | 'shape'>('word');
   const [motionTargetId, setMotionTargetId] = useState<string>('kinetic');
   const [motionIsHolding, setMotionIsHolding] = useState<boolean>(false);
   const [motionMustRelease, setMotionMustRelease] = useState<boolean>(false);
@@ -36,9 +47,6 @@ export function DualStageCaptchaCard() {
 
   const motionIsHoldingRef = useRef(false);
   motionIsHoldingRef.current = motionIsHolding;
-
-  // Active round type
-  const activeRoundType = currentRound === 1 ? roundTypes[0] : roundTypes[1];
 
   // Security Engine
   const {
@@ -62,11 +70,11 @@ export function DualStageCaptchaCard() {
     decoys: flashlightDecoys,
     dynamicDomDecoys: flashlightDynamicDecoys,
     cycleWord: cycleFlashlightWord,
-  } = useFlashlightWords(activeRoundType === 'flashlight' && securityStatus === 'challenging');
+  } = useFlashlightWords(activeStage === 'flashlight' && securityStatus === 'challenging');
 
-  // Roll new Motion target
-  const rollNewMotionTarget = useCallback((selectedMode: 'word' | 'shape') => {
-    const list = selectedMode === 'shape' ? SHAPES : WORDS;
+  // Roll new Motion target based on active stage (word or shape)
+  const rollNewMotionTarget = useCallback((mode: 'word' | 'shape') => {
+    const list = mode === 'shape' ? SHAPES : WORDS;
     const randomItem = list[Math.floor(Math.random() * list.length)];
     if (randomItem) {
       setMotionTargetId(randomItem.id.toLowerCase());
@@ -76,14 +84,16 @@ export function DualStageCaptchaCard() {
     setInputError(false);
   }, []);
 
-  // Initialize motion target
+  // Initialize or re-roll target when stage changes
   useEffect(() => {
-    rollNewMotionTarget(motionMode);
-  }, [motionMode, rollNewMotionTarget]);
+    if (isMotion) {
+      rollNewMotionTarget(motionMode);
+    }
+  }, [isMotion, motionMode, rollNewMotionTarget]);
 
   // Motion 8-second rotation timer loop
   useEffect(() => {
-    if (activeRoundType !== 'motion' || securityStatus !== 'challenging' || isTransitioning) return;
+    if (!isMotion || securityStatus !== 'challenging' || isTransitioning) return;
 
     const totalMs = MOTION_ROTATION_SECONDS * 1000;
     const intervalMs = 100;
@@ -107,7 +117,7 @@ export function DualStageCaptchaCard() {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [activeRoundType, securityStatus, isTransitioning, motionMode, rollNewMotionTarget]);
+  }, [isMotion, securityStatus, isTransitioning, motionMode, rollNewMotionTarget]);
 
   // Spacebar hold support
   useEffect(() => {
@@ -115,7 +125,7 @@ export function DualStageCaptchaCard() {
       if (e.code === 'Space' && !e.repeat && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         if (securityStatus === 'challenging' && !motionMustRelease) {
-          if (activeRoundType === 'motion') {
+          if (isMotion) {
             setMotionIsHolding(true);
             onPointerHoldStart();
           }
@@ -125,7 +135,7 @@ export function DualStageCaptchaCard() {
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space' && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
-        if (activeRoundType === 'motion') {
+        if (isMotion) {
           setMotionIsHolding(false);
           setMotionMustRelease(false);
           onPointerHoldEnd();
@@ -139,7 +149,7 @@ export function DualStageCaptchaCard() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [securityStatus, motionMustRelease, activeRoundType, onPointerHoldStart, onPointerHoldEnd]);
+  }, [securityStatus, motionMustRelease, isMotion, onPointerHoldStart, onPointerHoldEnd]);
 
   // Motion hold handlers
   const handleStartMotionHold = () => {
@@ -159,7 +169,7 @@ export function DualStageCaptchaCard() {
     if (e) e.preventDefault();
     if (securityStatus !== 'challenging' || !userInput.trim() || isTransitioning) return;
 
-    if (activeRoundType === 'motion') {
+    if (isMotion) {
       const isCorrect = verifyAnswer(
         userInput,
         motionTargetId,
@@ -189,14 +199,13 @@ export function DualStageCaptchaCard() {
     }
   };
 
-  // Handlers for round progression
+  // Handlers for round progression across 3 rounds
   const handleRoundPassed = () => {
     setUserInput('');
     setInputError(false);
 
-    if (currentRound === 1) {
-      // Completed Round 1
-      setRound1Complete(true);
+    if (currentRound < 3) {
+      // Completed Round 1 or 2
       setIsTransitioning(true);
 
       confetti({
@@ -206,15 +215,15 @@ export function DualStageCaptchaCard() {
         colors: ['#06b6d4', '#10b981'],
       });
 
-      // Transition to Round 2 after 1.1s
+      const nextRound = (currentRound + 1) as 2 | 3;
+
       setTimeout(() => {
         resetRoundMetrics();
-        setCurrentRound(2);
+        setCurrentRound(nextRound);
         setIsTransitioning(false);
-      }, 1100);
+      }, 1000);
     } else {
-      // Completed Round 2
-      setRound2Complete(true);
+      // Completed all 3 Rounds! Full verification
       completeVerification();
     }
   };
@@ -227,10 +236,8 @@ export function DualStageCaptchaCard() {
   // Reset entire challenge
   const handleFullReset = () => {
     resetChallenge();
-    setRoundTypes(Math.random() < 0.5 ? ['motion', 'flashlight'] : ['flashlight', 'motion']);
+    setStages(generateRandomStages());
     setCurrentRound(1);
-    setRound1Complete(false);
-    setRound2Complete(false);
     setIsTransitioning(false);
     setUserInput('');
     setInputError(false);
@@ -248,16 +255,38 @@ export function DualStageCaptchaCard() {
     triggerBotDetection(category, msg, detail);
   };
 
+  // Dynamic placeholder text
+  const getInputPlaceholder = () => {
+    if (activeStage === 'motion-shape') {
+      return 'Type revealed shape (e.g. star, heart)...';
+    }
+    if (activeStage === 'motion-word') {
+      return 'Type revealed word...';
+    }
+    return 'Type flashlight word...';
+  };
+
+  // Dynamic hold button text
+  const getMotionButtonText = () => {
+    if (motionMustRelease) {
+      return 'Key Expired — Release & Hold Again';
+    }
+    if (motionIsHolding) {
+      return activeStage === 'motion-shape' ? 'Revealing Motion Shape...' : 'Revealing Motion Word...';
+    }
+    return activeStage === 'motion-shape' ? 'Press & Hold to Reveal Shape' : 'Press & Hold to Reveal Word';
+  };
+
   return (
     <div
       id="quantum-containment-unit"
-      data-subsystem="dual-stage-biometric-v42"
+      data-subsystem="triple-stage-biometric-v42"
       className="w-full max-w-[480px] bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-4"
     >
       {/* Invisible prompt injection traps & dynamically rotating joke DOM decoys */}
       <HoneypotTraps
         dynamicDecoys={flashlightDynamicDecoys}
-        targetId={activeRoundType === 'motion' ? motionTargetId : flashlightTarget.word}
+        targetId={isMotion ? motionTargetId : flashlightTarget.word}
         onTrapTriggered={handleTrapTriggered}
       />
 
@@ -267,7 +296,7 @@ export function DualStageCaptchaCard() {
           <ShieldCheck className="w-4 h-4 text-cyan-400" />
           <span className="text-xs font-medium text-slate-300">Security Check</span>
           <span className="text-[11px] font-mono text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
-            Round {currentRound} of 2
+            Round {currentRound} of 3
           </span>
         </div>
 
@@ -290,23 +319,22 @@ export function DualStageCaptchaCard() {
       {securityStatus === 'verified' && (
         <VerificationSuccessCard
           solveTimeSeconds={solveTimeSeconds}
-          round1Type={roundTypes[0]}
-          round2Type={roundTypes[1]}
+          stages={stages}
           onReset={handleFullReset}
         />
       )}
 
-      {/* VIEW: Intermediate Round 1 Transition Screen */}
+      {/* VIEW: Intermediate Round Transition Screen */}
       {isTransitioning && securityStatus === 'challenging' && (
         <div className="p-8 rounded-2xl bg-slate-950/90 border border-cyan-500/40 text-center space-y-3 animate-fadeIn">
           <div className="inline-flex p-3 rounded-full bg-cyan-500/20 text-cyan-400 mb-1">
             <CheckCircle className="w-8 h-8" />
           </div>
           <h4 className="text-base font-bold text-slate-100 font-mono">
-            Round 1 Verified!
+            Round {currentRound} Verified!
           </h4>
           <p className="text-xs text-slate-400">
-            Initializing Round 2 challenge...
+            Initializing Round {currentRound + 1}...
           </p>
           <div className="w-32 h-1 bg-slate-900 mx-auto rounded-full overflow-hidden">
             <div className="h-full bg-cyan-400 animate-pulse w-full" />
@@ -318,43 +346,14 @@ export function DualStageCaptchaCard() {
       {securityStatus === 'challenging' && !isTransitioning && (
         <div className="space-y-4">
           {/* Active Canvas Display */}
-          {activeRoundType === 'motion' ? (
+          {isMotion ? (
             <div className="space-y-2">
-              {/* Mode toggles for Words vs Shapes */}
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Hold button or Spacebar to reveal
+              {/* Instruction banner without manual mode selector */}
+              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono px-0.5">
+                <span>Hold button or Spacebar to reveal</span>
+                <span className="text-slate-400">
+                  Target: {activeStage === 'motion-shape' ? 'Shape' : 'Word'}
                 </span>
-                <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMotionMode('word');
-                      setMotionMustRelease(false);
-                    }}
-                    className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                      motionMode === 'word'
-                        ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Words
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMotionMode('shape');
-                      setMotionMustRelease(false);
-                    }}
-                    className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                      motionMode === 'shape'
-                        ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Shapes
-                  </button>
-                </div>
               </div>
 
               {/* Kinetic Motion Canvas */}
@@ -391,11 +390,7 @@ export function DualStageCaptchaCard() {
                     : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 active:scale-[0.99]'
                 }`}
               >
-                {motionMustRelease
-                  ? 'Key Expired — Release & Hold Again'
-                  : motionIsHolding
-                  ? 'Revealing Kinetic Motion...'
-                  : 'Press & Hold to Reveal Motion'}
+                {getMotionButtonText()}
               </button>
             </div>
           ) : (
@@ -429,13 +424,7 @@ export function DualStageCaptchaCard() {
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder={
-                  activeRoundType === 'motion'
-                    ? motionMode === 'word'
-                      ? 'Type revealed word...'
-                      : 'Type revealed shape (e.g. star, heart)...'
-                    : 'Type flashlight word...'
-                }
+                placeholder={getInputPlaceholder()}
                 autoComplete="off"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -453,7 +442,7 @@ export function DualStageCaptchaCard() {
               disabled={!userInput.trim()}
               className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-xs font-semibold text-slate-950 shadow-md shadow-cyan-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5"
             >
-              <span>{currentRound === 1 ? 'Next' : 'Verify'}</span>
+              <span>{currentRound < 3 ? 'Next' : 'Verify'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>

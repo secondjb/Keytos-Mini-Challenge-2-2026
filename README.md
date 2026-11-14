@@ -1,17 +1,18 @@
-# Keytos Mini-Challenge #2: Dual-Entropy Biometric CAPTCHA
+# Keytos Mini-Challenge #2: Multi-Stage Biometric CAPTCHA
 
-Dual-round CAPTCHA system combining Kinetic Motion Coherence (Random Dot Kinematogram) and Darkroom Flashlight Vector Scanning to defeat vision LLMs, headless browsers, and automated scripts.
+Triple-stage CAPTCHA verification system combining Kinetic Motion Coherence (Words & Shapes) and Darkroom Flashlight Vector Scanning to defeat vision LLMs, headless browsers, and automated scripts.
 
 ---
 
 ## Overview
 
-Static images and standard OCR challenges are easily solved by modern vision models. This system verifies human presence through continuous kinetic interaction across two randomized rounds:
+Static images and standard OCR challenges are easily solved by modern vision models. This system verifies human presence through continuous kinetic interaction across **three randomized rounds**:
 
-1. **Kinetic Motion Coherence (RDK):** Dots move randomly until held. Coherent motion reveals hidden text via human visual persistence. Single-frame screenshots contain no legible signal.
-2. **Darkroom Flashlight Beam:** Text is obscured on a dark canvas with ambient flicker and decoy glyphs. Users hold and sweep a spotlight beam across the canvas to locate and read rotated vector text.
+1. **Kinetic Motion Coherence (Word):** Dots move randomly until held. Coherent motion reveals hidden word text via human visual persistence. Single-frame screenshots contain no legible signal.
+2. **Kinetic Motion Coherence (Shape):** Dots move coherently upon hold to reveal geometric shape silhouettes (star, heart, diamond, triangle, etc.).
+3. **Darkroom Flashlight Beam:** Text is obscured on a dark canvas with ambient flicker and decoy glyphs. Users hold and sweep a spotlight beam across the canvas to locate and read rotated vector text.
 
-Both rounds must be solved consecutively in randomized order (Motion -> Flashlight or Flashlight -> Motion). Upon completion, a signed verification token (`KEYTOS_PASS_<hash>_<timestamp>`) is issued with solve telemetry.
+All 3 rounds must be solved consecutively in randomized order (any permutation of the 3 stages). Upon completion, a signed verification token (`KEYTOS_PASS_<hash>_<timestamp>`) is issued with solve telemetry.
 
 ---
 

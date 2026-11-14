@@ -2,17 +2,17 @@ import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, RotateCcw, Key, Copy, Check } from 'lucide-react';
 
+export type StageType = 'motion-word' | 'motion-shape' | 'flashlight';
+
 interface VerificationSuccessCardProps {
   solveTimeSeconds: number | null;
-  round1Type: 'motion' | 'flashlight';
-  round2Type: 'motion' | 'flashlight';
+  stages: StageType[];
   onReset: () => void;
 }
 
 export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = ({
   solveTimeSeconds,
-  round1Type,
-  round2Type,
+  stages,
   onReset,
 }) => {
   const [tokenCopied, setTokenCopied] = useState<boolean>(false);
@@ -22,10 +22,9 @@ export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = (
   });
 
   useEffect(() => {
-    // Launch festive dual confetti blast
     confetti({
-      particleCount: 80,
-      spread: 70,
+      particleCount: 90,
+      spread: 75,
       origin: { y: 0.6 },
       colors: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6'],
     });
@@ -56,8 +55,15 @@ export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = (
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const formatName = (type: 'motion' | 'flashlight') => {
-    return type === 'motion' ? 'Kinetic Motion Coherence' : 'Darkroom Flashlight Beam';
+  const formatName = (type: StageType) => {
+    switch (type) {
+      case 'motion-word':
+        return 'Kinetic Motion (Word)';
+      case 'motion-shape':
+        return 'Kinetic Motion (Shape)';
+      case 'flashlight':
+        return 'Darkroom Flashlight Beam';
+    }
   };
 
   return (
@@ -72,9 +78,9 @@ export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = (
           Identity Fully Verified
         </h3>
         <p className="text-xs text-slate-400">
-          Both challenges passed in{' '}
+          All 3 challenges passed in{' '}
           <span className="font-bold text-emerald-300 font-mono text-sm">
-            {solveTimeSeconds ?? 6.2}s
+            {solveTimeSeconds ?? 8.4}s
           </span>
         </p>
       </div>
@@ -84,20 +90,17 @@ export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = (
         <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
           Multi-Factor Challenge Breakdown
         </div>
-        <div className="flex items-center justify-between text-slate-300">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Round 1: {formatName(round1Type)}</span>
+        {stages.map((stage, idx) => (
+          <div key={idx} className="flex items-center justify-between text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>
+                Round {idx + 1}: {formatName(stage)}
+              </span>
+            </div>
+            <span className="font-mono text-emerald-400 font-semibold text-[11px]">VERIFIED ✓</span>
           </div>
-          <span className="font-mono text-emerald-400 font-semibold text-[11px]">VERIFIED ✓</span>
-        </div>
-        <div className="flex items-center justify-between text-slate-300">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Round 2: {formatName(round2Type)}</span>
-          </div>
-          <span className="font-mono text-emerald-400 font-semibold text-[11px]">VERIFIED ✓</span>
-        </div>
+        ))}
       </div>
 
       {/* Cryptographic Token */}
