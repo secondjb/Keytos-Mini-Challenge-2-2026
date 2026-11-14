@@ -72,7 +72,7 @@ export const VerificationSuccessCard: React.FC<VerificationSuccessCardProps> = (
           Identity Fully Verified
         </h3>
         <p className="text-xs text-slate-400">
-          Both biometric entropy challenges passed in{' '}
+          Both challenges passed in{' '}
           <span className="font-bold text-emerald-300 font-mono text-sm">
             {solveTimeSeconds ?? 6.2}s
           </span>

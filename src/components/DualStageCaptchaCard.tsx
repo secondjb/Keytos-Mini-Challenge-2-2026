@@ -1,22 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { RotateCw, Volume2, VolumeX, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
+import { RotateCw, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
 import { MotionCanvas } from './MotionCanvas';
 import { FlashlightCanvas } from './FlashlightCanvas';
 import { HoneypotTraps } from './HoneypotTraps';
-import { RoundProgressStepper } from './RoundProgressStepper';
 import { VerificationSuccessCard } from './VerificationSuccessCard';
 import { BotDetectedCard } from './BotDetectedCard';
 import { useSecurityEngine, type SecurityViolation } from '../hooks/useSecurityEngine';
 import { useFlashlightWords } from '../hooks/useFlashlightWords';
 import { SHAPES, WORDS } from '../utils/captchaPatterns';
-import {
-  playFlashlightClick,
-  playTick,
-  playRoundChime,
-  playSuccessSound,
-  playAlarmSound,
-} from '../utils/audioEffects';
 
 const MOTION_ROTATION_SECONDS = 8;
 
@@ -27,10 +19,9 @@ export function DualStageCaptchaCard() {
   );
 
   const [currentRound, setCurrentRound] = useState<1 | 2>(1);
-  const [round1Complete, setRound1Complete] = useState<boolean>(false);
-  const [round2Complete, setRound2Complete] = useState<boolean>(false);
+  const [, setRound1Complete] = useState<boolean>(false);
+  const [, setRound2Complete] = useState<boolean>(false);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
 
   // Form input and error shake state
   const [userInput, setUserInput] = useState<string>('');
@@ -107,7 +98,6 @@ export function DualStageCaptchaCard() {
         elapsed = 0;
         setMotionProgress(100);
         rollNewMotionTarget(motionMode);
-        playTick(audioEnabled);
 
         if (motionIsHoldingRef.current) {
           setMotionIsHolding(false);
@@ -117,9 +107,9 @@ export function DualStageCaptchaCard() {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [activeRoundType, securityStatus, isTransitioning, motionMode, rollNewMotionTarget, audioEnabled]);
+  }, [activeRoundType, securityStatus, isTransitioning, motionMode, rollNewMotionTarget]);
 
-  // Spacebar hold support for accessibility and desktop power users
+  // Spacebar hold support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat && document.activeElement?.tagName !== 'INPUT') {
@@ -128,7 +118,6 @@ export function DualStageCaptchaCard() {
           if (activeRoundType === 'motion') {
             setMotionIsHolding(true);
             onPointerHoldStart();
-            playFlashlightClick(audioEnabled);
           }
         }
       }
@@ -150,14 +139,13 @@ export function DualStageCaptchaCard() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [securityStatus, motionMustRelease, activeRoundType, onPointerHoldStart, onPointerHoldEnd, audioEnabled]);
+  }, [securityStatus, motionMustRelease, activeRoundType, onPointerHoldStart, onPointerHoldEnd]);
 
   // Motion hold handlers
   const handleStartMotionHold = () => {
     if (securityStatus !== 'challenging' || motionMustRelease) return;
     setMotionIsHolding(true);
     onPointerHoldStart();
-    playFlashlightClick(audioEnabled);
   };
 
   const handleEndMotionHold = () => {
@@ -207,14 +195,13 @@ export function DualStageCaptchaCard() {
     setInputError(false);
 
     if (currentRound === 1) {
-      // Completed Round 1!
+      // Completed Round 1
       setRound1Complete(true);
       setIsTransitioning(true);
-      playRoundChime(audioEnabled);
 
       confetti({
-        particleCount: 40,
-        spread: 50,
+        particleCount: 35,
+        spread: 45,
         origin: { y: 0.6 },
         colors: ['#06b6d4', '#10b981'],
       });
@@ -226,16 +213,14 @@ export function DualStageCaptchaCard() {
         setIsTransitioning(false);
       }, 1100);
     } else {
-      // Completed Round 2! Full verification
+      // Completed Round 2
       setRound2Complete(true);
       completeVerification();
-      playSuccessSound(audioEnabled);
     }
   };
 
   const handleRoundFailed = () => {
     setInputError(true);
-    playAlarmSound(audioEnabled);
     setTimeout(() => setInputError(false), 800);
   };
 
@@ -260,7 +245,6 @@ export function DualStageCaptchaCard() {
     msg: string,
     detail?: string
   ) => {
-    playAlarmSound(audioEnabled);
     triggerBotDetection(category, msg, detail);
   };
 
@@ -268,7 +252,7 @@ export function DualStageCaptchaCard() {
     <div
       id="quantum-containment-unit"
       data-subsystem="dual-stage-biometric-v42"
-      className="w-full max-w-[500px] bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-4"
+      className="w-full max-w-[480px] bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-4"
     >
       {/* Invisible prompt injection traps & dynamically rotating joke DOM decoys */}
       <HoneypotTraps
@@ -277,47 +261,24 @@ export function DualStageCaptchaCard() {
         onTrapTriggered={handleTrapTriggered}
       />
 
-      {/* Top Header & Stepper */}
-      <RoundProgressStepper
-        currentRound={currentRound}
-        round1Type={roundTypes[0]}
-        round2Type={roundTypes[1]}
-        round1Complete={round1Complete}
-        round2Complete={round2Complete}
-      />
-
-      {/* Audio & Refresh Toolbar */}
-      <div className="flex items-center justify-between pb-1 text-xs">
-        <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[11px]">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span>
-            {activeRoundType === 'motion'
-              ? 'Stage: Kinetic Motion Parallax'
-              : 'Stage: Darkroom Vector Flashlight'}
+      {/* Clean minimal Header Bar */}
+      <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-cyan-400" />
+          <span className="text-xs font-medium text-slate-300">Security Check</span>
+          <span className="text-[11px] font-mono text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+            Round {currentRound} of 2
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Sound Toggle */}
-          <button
-            type="button"
-            onClick={() => setAudioEnabled(!audioEnabled)}
-            title={audioEnabled ? 'Mute Sounds' : 'Enable Sounds'}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
-          >
-            {audioEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* New Challenge Button */}
-          <button
-            type="button"
-            onClick={handleFullReset}
-            title="Reset & Generate New Challenge"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleFullReset}
+          title="New Challenge"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* VIEW: Bot Detected Alert Screen */}
@@ -345,7 +306,7 @@ export function DualStageCaptchaCard() {
             Round 1 Verified!
           </h4>
           <p className="text-xs text-slate-400">
-            Initializing Round 2 challenge ({roundTypes[1] === 'motion' ? 'Kinetic Motion' : 'Darkroom Flashlight'})...
+            Initializing Round 2 challenge...
           </p>
           <div className="w-32 h-1 bg-slate-900 mx-auto rounded-full overflow-hidden">
             <div className="h-full bg-cyan-400 animate-pulse w-full" />
@@ -433,7 +394,7 @@ export function DualStageCaptchaCard() {
                 {motionMustRelease
                   ? 'Key Expired — Release & Hold Again'
                   : motionIsHolding
-                  ? 'Revealing Kinetic Velocity Field...'
+                  ? 'Revealing Kinetic Motion...'
                   : 'Press & Hold to Reveal Motion'}
               </button>
             </div>
@@ -444,10 +405,7 @@ export function DualStageCaptchaCard() {
                 target={flashlightTarget}
                 decoys={flashlightDecoys}
                 onPointerMove={recordPointerMove}
-                onPointerHoldStart={() => {
-                  onPointerHoldStart();
-                  playFlashlightClick(audioEnabled);
-                }}
+                onPointerHoldStart={onPointerHoldStart}
                 onPointerHoldEnd={onPointerHoldEnd}
                 onTriggerViolation={handleTrapTriggered}
               />
@@ -509,13 +467,12 @@ export function DualStageCaptchaCard() {
         </div>
       )}
 
-      {/* Footer Branding */}
+      {/* Minimal Footer */}
       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
         <span className="flex items-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-cyan-500" />
-          <span>Keytos Mini-Challenge #2</span>
+          <span>Keytos Security</span>
         </span>
-        <span>Anti-Bot Biometric Protection</span>
       </div>
     </div>
   );

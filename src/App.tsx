@@ -13,11 +13,6 @@ export function App() {
       <main className="relative z-10 w-full flex flex-col items-center justify-center">
         <DualStageCaptchaCard />
       </main>
-
-      {/* Subtle attribution note */}
-      <footer className="relative z-10 mt-6 text-center text-[12px] text-slate-500 font-mono">
-        Built for Keytos Mini-Challenge #2 • Motion & Flashlight Dual-Entropy Verification
-      </footer>
     </div>
   );
 }
