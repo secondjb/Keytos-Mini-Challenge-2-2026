@@ -16,6 +16,24 @@ All 3 rounds must be solved consecutively in randomized order (any permutation o
 
 ---
 
+## Screenshots
+
+### Verification Challenge Stages
+
+| 1. Kinetic Motion (Idle Noise) | 2. Motion Reveal (Hold in Action) | 3. Darkroom Flashlight Beam |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/round1-kinetic-idle.jpg" width="280" alt="Kinetic Motion Idle" /> | <img src="docs/screenshots/round2-kinetic-revealed.jpg" width="280" alt="Kinetic Motion Revealed" /> | <img src="docs/screenshots/round3-flashlight-reveal.jpg" width="280" alt="Darkroom Flashlight Reveal" /> |
+| **Noise Mask**: Single frame contains zero legible text, defeating OCR and vision models. | **Visual Persistence**: Holding reveals coherent kinetic word (*e.g., "BRAIN"*) via human retinal persistence. | **Spotlight Scan**: User sweeps interactive vector spotlight to uncover rotating word (*e.g., "SHADOW"*). |
+
+### Bot Detection & Telemetry Traps
+
+| Adversarial OCR Trap in Action |
+| :---: |
+| <img src="docs/screenshots/bot-detection-trap.png" width="480" alt="Bot Pattern Detected Screen" /> |
+| **Poisoned Background OCR Trap**: Multimodal LLMs attempting OCR on the canvas read poisoned decoy instructions (`0000`), triggering instant telemetry lockout and access denial. |
+
+---
+
 ## Security Architecture
 
 | Layer | Mechanism | Target Threat |
@@ -64,6 +82,9 @@ npm run preview
 
 ```
 .
+├── docs/
+│   ├── screenshots/                # Challenge walkthrough and defense screenshots
+│   └── ...                         # Video walkthroughs and evaluation captures
 ├── public/
 │   ├── favicon.svg
 │   └── icons.svg
